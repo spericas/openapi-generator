@@ -21,7 +21,6 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import io.swagger.v3.oas.models.Operation;
@@ -55,12 +54,9 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
     public static final String ASYNC_NATIVE = "asyncNative";
     public static final String CONFIG_KEY = "configKey";
     public static final String USE_RUNTIME_EXCEPTION = "useRuntimeException";
-    public static final String CASE_INSENSITIVE_RESPONSE_HEADERS = "caseInsensitiveResponseHeaders";
     public static final String DYNAMIC_OPERATIONS = "dynamicOperations";
     public static final String GRADLE_PROPERTIES = "gradleProperties";
 
-    public static final String MICROPROFILE_REST_CLIENT_VERSION = "microprofileRestClientVersion";
-    public static final String MICROPROFILE_REST_CLIENT_DEFAULT_VERSION = "2.0";
     public static final String MICROPROFILE_REST_CLIENT_DEFAULT_ROOT_PACKAGE = "javax";
 
     public static final String HELIDON_MP = "mp";
@@ -75,25 +71,12 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
     protected boolean useBeanValidation = false;
     protected boolean performBeanValidation = false;
     protected boolean useGzipFeature = false;
-    protected boolean useReflectionEqualsHashCode = false;
     protected boolean caseInsensitiveResponseHeaders = false;
     protected boolean dynamicOperations = false;
     protected String gradleProperties;
     protected String authFolder;
     protected String serializationLibrary = null;
-    protected boolean useOneOfDiscriminatorLookup = false; // use oneOf discriminator's mapping for model lookup
     protected String rootJavaEEPackage;
-    protected Map<String, MpRestClientVersion> mpRestClientVersions = new HashMap<>();
-
-    private static class MpRestClientVersion {
-        public final String rootPackage;
-        public final String pomTemplate;
-
-        public MpRestClientVersion(String rootPackage, String pomTemplate) {
-            this.rootPackage = rootPackage;
-            this.pomTemplate = pomTemplate;
-        }
-    }
 
     public JavaHelidonClientCodegen() {
         // TODO: Move GlobalFeature.ParameterizedServer to library: jersey after moving featureSet to generatorMetadata
@@ -126,8 +109,6 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
         cliOptions.add(CliOption.newBoolean(DYNAMIC_OPERATIONS, "Generate operations dynamically at runtime from an OAS", this.dynamicOperations));
         cliOptions.add(CliOption.newString(GRADLE_PROPERTIES, "Append additional Gradle properties to the gradle.properties file"));
         cliOptions.add(CliOption.newString(CONFIG_KEY, "Config key in @RegisterRestClient. Default to none. Only `microprofile` supports this option."));
-        cliOptions.add(CliOption.newBoolean(CodegenConstants.USE_ONEOF_DISCRIMINATOR_LOOKUP, CodegenConstants.USE_ONEOF_DISCRIMINATOR_LOOKUP_DESC + " Only jersey2, jersey3, native, okhttp-gson support this option."));
-        cliOptions.add(CliOption.newString(MICROPROFILE_REST_CLIENT_VERSION, "Version of MicroProfile Rest Client API."));
 
         supportedLibraries.put(HELIDON_MP, "Helidon MP Client using Microprofile");
         supportedLibraries.put(HELIDON_SE, "Helidon SE Client");
@@ -151,14 +132,6 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
         // inherit from self, any oneOf schemas, any anyOf schemas, any x-discriminator-values,
         // and the discriminator mapping schemas in the OAS document.
         this.setLegacyDiscriminatorBehavior(false);
-
-        initMpRestClientVersionToRootPackage();
-    }
-
-    private void initMpRestClientVersionToRootPackage() {
-        mpRestClientVersions.put("1.4.1", new MpRestClientVersion("javax", "pom.mustache"));
-        mpRestClientVersions.put("2.0", new MpRestClientVersion("javax", "pom.mustache"));
-        mpRestClientVersions.put("3.0", new MpRestClientVersion("jakarta", "pom_3.0.mustache"));
     }
 
     @Override
@@ -189,32 +162,8 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
     public void processOpts() {
         super.processOpts();
 
-        if (additionalProperties.containsKey(CodegenConstants.USE_ONEOF_DISCRIMINATOR_LOOKUP)) {
-            setUseOneOfDiscriminatorLookup(convertPropertyToBooleanAndWriteBack(CodegenConstants.USE_ONEOF_DISCRIMINATOR_LOOKUP));
-        } else {
-            additionalProperties.put(CodegenConstants.USE_ONEOF_DISCRIMINATOR_LOOKUP, useOneOfDiscriminatorLookup);
-        }
-
-        if (!additionalProperties.containsKey(MICROPROFILE_REST_CLIENT_VERSION)) {
-            additionalProperties.put(MICROPROFILE_REST_CLIENT_VERSION, MICROPROFILE_REST_CLIENT_DEFAULT_VERSION);
-        } else {
-            String mpRestClientVersion = (String) additionalProperties.get(MICROPROFILE_REST_CLIENT_VERSION);
-            if (!mpRestClientVersions.containsKey(mpRestClientVersion)) {
-                throw new IllegalArgumentException(
-                        String.format(Locale.ROOT,
-                                "Version %s of MicroProfile Rest Client is not supported or incorrect. Supported versions are %s",
-                                mpRestClientVersion,
-                                String.join(", ", mpRestClientVersions.keySet())
-                        )
-                );
-            }
-        }
         if (!additionalProperties.containsKey("rootJavaEEPackage")) {
-            String mpRestClientVersion = (String) additionalProperties.get(MICROPROFILE_REST_CLIENT_VERSION);
-            if (mpRestClientVersions.containsKey(mpRestClientVersion)) {
-                rootJavaEEPackage = mpRestClientVersions.get(mpRestClientVersion).rootPackage;
-            }
-            additionalProperties.put("rootJavaEEPackage", rootJavaEEPackage);
+            additionalProperties.put("rootJavaEEPackage", "javax");
         }
 
         if (additionalProperties.containsKey(CONFIG_KEY)) {
@@ -237,10 +186,6 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
             this.setUseGzipFeature(convertPropertyToBooleanAndWriteBack(USE_GZIP_FEATURE));
         }
 
-        if (additionalProperties.containsKey(CASE_INSENSITIVE_RESPONSE_HEADERS)) {
-            this.setUseReflectionEqualsHashCode(convertPropertyToBooleanAndWriteBack(CASE_INSENSITIVE_RESPONSE_HEADERS));
-        }
-
         if (additionalProperties.containsKey(DYNAMIC_OPERATIONS)) {
             this.setDynamicOperations(Boolean.parseBoolean(additionalProperties.get(DYNAMIC_OPERATIONS).toString()));
         }
@@ -252,11 +197,8 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
         additionalProperties.put(GRADLE_PROPERTIES, gradleProperties);
 
         final String invokerFolder = (sourceFolder + '/' + invokerPackage).replace(".", "/");
-        final String apiFolder = (sourceFolder + '/' + apiPackage).replace(".", "/");
-        final String modelsFolder = (sourceFolder + File.separator + modelPackage().replace('.', File.separatorChar)).replace('/', File.separatorChar);
         authFolder = (sourceFolder + '/' + invokerPackage + ".auth").replace(".", "/");
 
-        //Common files
         supportingFiles.add(new SupportingFile("pom.mustache", "", "pom.xml").doNotOverwrite());
         supportingFiles.add(new SupportingFile("README.mustache", "", "README.md").doNotOverwrite());
         supportingFiles.add(new SupportingFile("build.gradle.mustache", "", "build.gradle").doNotOverwrite());
@@ -302,17 +244,11 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
         if (HELIDON_MP.equals(getLibrary())) {
             supportingFiles.clear(); // Don't need extra files provided by Java Codegen
             String apiExceptionFolder = (sourceFolder + File.separator + apiPackage().replace('.', File.separatorChar)).replace('/', File.separatorChar);
-            String mpRestClientVersion = (String) additionalProperties.get(MICROPROFILE_REST_CLIENT_VERSION);
-            String pomTemplate = mpRestClientVersions.get(mpRestClientVersion).pomTemplate;
-            supportingFiles.add(new SupportingFile(pomTemplate, "", "pom.xml"));
+            supportingFiles.add(new SupportingFile("pom.mustache", "", "pom.xml"));
             supportingFiles.add(new SupportingFile("README.mustache", "", "README.md"));
             supportingFiles.add(new SupportingFile("api_exception.mustache", apiExceptionFolder, "ApiException.java"));
             supportingFiles.add(new SupportingFile("api_exception_mapper.mustache", apiExceptionFolder, "ApiExceptionMapper.java"));
             serializationLibrary = "none";
-
-            if ("3.0".equals(mpRestClientVersion)) {
-                additionalProperties.put("microprofile3", true);
-            }
         } else {
             LOGGER.error("Unknown library option (-l/--library): {}", getLibrary());
         }
@@ -461,14 +397,6 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
         return objs;
     }
 
-    public void setUseOneOfDiscriminatorLookup(boolean useOneOfDiscriminatorLookup) {
-        this.useOneOfDiscriminatorLookup = useOneOfDiscriminatorLookup;
-    }
-
-    public boolean getUseOneOfDiscriminatorLookup() {
-        return this.useOneOfDiscriminatorLookup;
-    }
-
     public void setAsyncNative(boolean asyncNative) {
         this.asyncNative = asyncNative;
     }
@@ -487,10 +415,6 @@ public class JavaHelidonClientCodegen extends AbstractJavaCodegen
 
     public void setUseGzipFeature(boolean useGzipFeature) {
         this.useGzipFeature = useGzipFeature;
-    }
-
-    public void setUseReflectionEqualsHashCode(boolean useReflectionEqualsHashCode) {
-        this.useReflectionEqualsHashCode = useReflectionEqualsHashCode;
     }
 
     public void setCaseInsensitiveResponseHeaders(final Boolean caseInsensitiveResponseHeaders) {
