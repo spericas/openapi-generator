@@ -1,13 +1,5 @@
-{{#withXml}}
-import {{rootJavaEEPackage}}.xml.bind.annotation.XmlElement;
-import {{rootJavaEEPackage}}.xml.bind.annotation.XmlRootElement;
-import {{rootJavaEEPackage}}.xml.bind.annotation.XmlAccessType;
-import {{rootJavaEEPackage}}.xml.bind.annotation.XmlAccessorType;
-import {{rootJavaEEPackage}}.xml.bind.annotation.XmlType;
-import {{rootJavaEEPackage}}.xml.bind.annotation.XmlEnum;
-import {{rootJavaEEPackage}}.xml.bind.annotation.XmlEnumValue;
-{{/withXml}}
-{{^withXml}}
+
+{{#jsonb}}
 import java.lang.reflect.Type;
 import {{rootJavaEEPackage}}.json.bind.annotation.JsonbTypeDeserializer;
 import {{rootJavaEEPackage}}.json.bind.annotation.JsonbTypeSerializer;
@@ -21,16 +13,8 @@ import {{rootJavaEEPackage}}.json.bind.annotation.JsonbProperty;
 {{#vendorExtensions.x-has-readonly-properties}}
 import {{rootJavaEEPackage}}.json.bind.annotation.JsonbCreator;
 {{/vendorExtensions.x-has-readonly-properties}}
-{{/withXml}}
+{{/jsonb}}
 
-{{#withXml}}
-@XmlAccessorType(XmlAccessType.FIELD)
-{{#hasVars}} @XmlType(name = "{{classname}}", propOrder =
-    { {{#vars}}"{{name}}"{{^-last}}, {{/-last}}{{/vars}}
-}){{/hasVars}}
-{{^hasVars}}@XmlType(name = "{{classname}}"){{/hasVars}}
-{{^parent}}@XmlRootElement(name="{{classname}}"){{/parent}}
-{{/withXml}}
 {{#description}}
 /**
   * {{{.}}}
@@ -44,17 +28,11 @@ public class {{classname}} {{#parent}}extends {{{.}}}{{/parent}}{{#vendorExtensi
   {{#vars}}{{#isEnum}}{{^isContainer}}
 {{>enumClass}}{{/isContainer}}{{#isContainer}}{{#mostInnerItems}}
 {{>enumClass}}{{/mostInnerItems}}{{/isContainer}}{{/isEnum}}
-{{#withXml}}
-  @XmlElement(name="{{baseName}}"{{#required}}, required = {{required}}{{/required}})
-{{/withXml}}
 {{#description}}
  /**
    * {{{.}}}
   **/
 {{/description}}
-  {{^withXml}}
-  @JsonbProperty("{{baseName}}")
-  {{/withXml}}
 {{#vendorExtensions.x-field-extra-annotation}}
 {{{vendorExtensions.x-field-extra-annotation}}}
 {{/vendorExtensions.x-field-extra-annotation}}
