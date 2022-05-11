@@ -5,7 +5,7 @@ package {{package}};
 {{#imports}}import {{import}};
 {{/imports}}
 import org.junit.Test;
-import org.junit.Before;
+import org.junit.BeforeClass;
 import static org.junit.Assert.*;
 
 import org.eclipse.microprofile.rest.client.RestClientBuilder;
@@ -20,8 +20,6 @@ import java.util.Map;
 import java.util.Set;
 {{/fullJavaUtil}}
 
-
-
 /**
  {{#appName}}
  * {{{.}}} Test
@@ -29,28 +27,17 @@ import java.util.Set;
  {{/appName}}
  * API tests for {{classname}}
  */
-{{#generateSpringBootApplication}}
-@RunWith(SpringJUnit4ClassRunner.class)
-@SpringApplicationConfiguration(classes = SpringBootApplication.class)
-@WebAppConfiguration
-@IntegrationTest("server.port=0")
-{{/generateSpringBootApplication}}
 public class {{classname}}Test {
 
-    private {{classname}} client;
-    private String baseUrl = "http://localhost:9080";
+    private static {{classname}} client;
+    private static final String baseUrl = "http://localhost:8080";
 
-    @Before
-    public void setup() throws MalformedURLException {
-        {{#microprofile3}}
-        // TODO initialize the client
-        {{/microprofile3}}
-        {{^microprofile3}}
+    @BeforeClass
+    public static void setup() throws MalformedURLException {
         client = RestClientBuilder.newBuilder()
                         .baseUrl(new URL(baseUrl))
                         .register(ApiException.class)
                         .build({{classname}}.class);
-        {{/microprofile3}}
     }
 
     {{#operations}}{{#operation}}
@@ -67,15 +54,13 @@ public class {{classname}}Test {
      *          if the Api call fails
      */
     @Test
-    public void {{operationId}}Test() {
+    public void {{operationId}}Test() throws Exception {
         // TODO: test validations
         {{#allParams}}
         {{^isFile}}{{{dataType}}} {{paramName}} = null;{{/isFile}}{{#isFile}}org.apache.cxf.jaxrs.ext.multipart.Attachment {{paramName}} = null;{{/isFile}}
         {{/allParams}}
-        //{{#returnType}}{{{.}}} response = {{/returnType}}api.{{operationId}}({{#allParams}}{{paramName}}{{^-last}}, {{/-last}}{{/allParams}});
+        //{{#returnType}}{{{.}}} response = {{/returnType}}client.{{operationId}}({{#allParams}}{{paramName}}{{^-last}}, {{/-last}}{{/allParams}});
         //{{#returnType}}assertNotNull(response);{{/returnType}}
-
-
     }
     {{/operation}}{{/operations}}
 }
