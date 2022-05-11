@@ -48,32 +48,23 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
 
     private final Logger LOGGER = LoggerFactory.getLogger(JavaHelidonClientCodegen.class);
 
-    public static final String ASYNC_NATIVE = "asyncNative";
     public static final String CONFIG_KEY = "configKey";
-    public static final String DYNAMIC_OPERATIONS = "dynamicOperations";
-    public static final String GRADLE_PROPERTIES = "gradleProperties";
 
-    public static final String MICROPROFILE_REST_CLIENT_DEFAULT_ROOT_PACKAGE = "javax";
-
-    public static final String HELIDON_MP = "mp";
-    public static final String HELIDON_SE = "se";
-
-    public static final String SERIALIZATION_LIBRARY_JACKSON = "jackson";
-    public static final String SERIALIZATION_LIBRARY_JSONB = "jsonb";
-
-    protected String gradleWrapperPackage = "gradle.wrapper";
     protected String configKey = null;
-    protected boolean asyncNative = false;
     protected boolean useBeanValidation = false;
     protected boolean performBeanValidation = false;
     protected boolean useGzipFeature = false;
     protected boolean caseInsensitiveResponseHeaders = false;
-    protected boolean dynamicOperations = false;
-    protected String gradleProperties;
     protected String authFolder;
     protected String serializationLibrary = null;
     protected String rootJavaEEPackage;
 
+    /**
+     * Constructor for this generator. Uses the embedded template dir to find common templates
+     * shared between Helidon client and server generators.
+     *
+     * @see org.openapitools.codegen.templating.GeneratorTemplateContentLocator#getFullTemplatePath
+     */
     public JavaHelidonClientCodegen() {
         // TODO: Move GlobalFeature.ParameterizedServer to library: jersey after moving featureSet to generatorMetadata
         modifyFeatureSet(features -> features
@@ -82,7 +73,8 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
         );
 
         outputFolder = "generated-code" + File.separator + "java";
-        embeddedTemplateDir = templateDir = "java-helidon/client";
+        embeddedTemplateDir = "java-helidon/common";        // use embedded for common
+        templateDir = "java-helidon/client";
         invokerPackage = "org.openapitools.client";
         artifactId = "openapi-java-client";
         apiPackage = invokerPackage + ".api";
@@ -98,9 +90,6 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
 
         cliOptions.add(CliOption.newBoolean(USE_BEANVALIDATION, "Use BeanValidation API annotations"));
         cliOptions.add(CliOption.newBoolean(PERFORM_BEANVALIDATION, "Perform BeanValidation"));
-        cliOptions.add(CliOption.newBoolean(ASYNC_NATIVE, "If true, async handlers will be used, instead of the sync version"));
-        cliOptions.add(CliOption.newBoolean(DYNAMIC_OPERATIONS, "Generate operations dynamically at runtime from an OAS", this.dynamicOperations));
-        cliOptions.add(CliOption.newString(GRADLE_PROPERTIES, "Append additional Gradle properties to the gradle.properties file"));
         cliOptions.add(CliOption.newString(CONFIG_KEY, "Config key in @RegisterRestClient. Default to none."));
 
         supportedLibraries.put(HELIDON_MP, "Helidon MP Client");
@@ -164,14 +153,8 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
             setSerializationLibrary(additionalProperties.get(CodegenConstants.SERIALIZATION_LIBRARY).toString());
         }
 
-        // -- TODO: Unsupported properties below ------------------------------
-
         if (additionalProperties.containsKey(CONFIG_KEY)) {
             setConfigKey(additionalProperties.get(CONFIG_KEY).toString());
-        }
-
-        if (additionalProperties.containsKey(ASYNC_NATIVE)) {
-            setAsyncNative(convertPropertyToBooleanAndWriteBack(ASYNC_NATIVE));
         }
 
         if (additionalProperties.containsKey(USE_BEANVALIDATION)) {
@@ -182,53 +165,19 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
             setPerformBeanValidation(convertPropertyToBooleanAndWriteBack(PERFORM_BEANVALIDATION));
         }
 
-        if (additionalProperties.containsKey(DYNAMIC_OPERATIONS)) {
-            setDynamicOperations(Boolean.parseBoolean(additionalProperties.get(DYNAMIC_OPERATIONS).toString()));
-        }
-        additionalProperties.put(DYNAMIC_OPERATIONS, dynamicOperations);
-
-        if (additionalProperties.containsKey(GRADLE_PROPERTIES)) {
-            setGradleProperties(additionalProperties.get(GRADLE_PROPERTIES).toString());
-        }
-        additionalProperties.put(GRADLE_PROPERTIES, gradleProperties);
-
         String invokerFolder = (sourceFolder + '/' + invokerPackage).replace(".", "/");
         authFolder = (sourceFolder + '/' + invokerPackage + ".auth").replace(".", "/");
-
-        supportingFiles.add(new SupportingFile("pom.mustache", "", "pom.xml").doNotOverwrite());
-        supportingFiles.add(new SupportingFile("README.mustache", "", "README.md").doNotOverwrite());
-        supportingFiles.add(new SupportingFile("build.gradle.mustache", "", "build.gradle").doNotOverwrite());
-        supportingFiles.add(new SupportingFile("settings.gradle.mustache", "", "settings.gradle").doNotOverwrite());
-        supportingFiles.add(new SupportingFile("gradle.properties.mustache", "", "gradle.properties").doNotOverwrite());
-        supportingFiles.add(new SupportingFile("manifest.mustache", projectFolder, "AndroidManifest.xml").doNotOverwrite());
-        supportingFiles.add(new SupportingFile("travis.mustache", "", ".travis.yml"));
-        supportingFiles.add(new SupportingFile("maven.yml.mustache", ".github/workflows", "maven.yml"));
-        if (dynamicOperations) {
-            supportingFiles.add(new SupportingFile("openapi.mustache", projectFolder + "/resources/openapi", "openapi.yaml"));
-            supportingFiles.add(new SupportingFile("apiOperation.mustache", invokerFolder, "ApiOperation.java"));
-        } else {
-            supportingFiles.add(new SupportingFile("openapi.mustache", "api", "openapi.yaml"));
-        }
 
         if (additionalProperties.containsKey("jsr310") && isLibrary(HELIDON_MP)) {
             supportingFiles.add(new SupportingFile("JavaTimeFormatter.mustache", invokerFolder, "JavaTimeFormatter.java"));
         }
-
-        supportingFiles.add(new SupportingFile("gradlew.mustache", "", "gradlew"));
-        supportingFiles.add(new SupportingFile("gradlew.bat.mustache", "", "gradlew.bat"));
-        supportingFiles.add(new SupportingFile("gradle-wrapper.properties.mustache",
-                gradleWrapperPackage.replace(".", File.separator), "gradle-wrapper.properties"));
-        supportingFiles.add(new SupportingFile("gradle-wrapper.jar",
-                gradleWrapperPackage.replace(".", File.separator), "gradle-wrapper.jar"));
-        supportingFiles.add(new SupportingFile("git_push.sh.mustache", "", "git_push.sh"));
-        supportingFiles.add(new SupportingFile("gitignore.mustache", "", ".gitignore"));
 
         if (performBeanValidation) {
             supportingFiles.add(new SupportingFile("BeanValidationException.mustache", invokerFolder,
                     "BeanValidationException.java"));
         }
 
-        if (HELIDON_MP.equals(getLibrary())) {
+        if (isLibrary(HELIDON_MP)) {
             supportingFiles.clear();
             String apiExceptionFolder = (sourceFolder + File.separator
                     + apiPackage().replace('.', File.separatorChar)).replace('/', File.separatorChar);
@@ -236,7 +185,7 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
             supportingFiles.add(new SupportingFile("README.mustache", "", "README.md"));
             supportingFiles.add(new SupportingFile("api_exception.mustache", apiExceptionFolder, "ApiException.java"));
             supportingFiles.add(new SupportingFile("api_exception_mapper.mustache", apiExceptionFolder, "ApiExceptionMapper.java"));
-        } else if (HELIDON_SE.equals(getLibrary())) {
+        } else if (isLibrary(HELIDON_SE)) {
             throw new UnsupportedOperationException("Not implemented");
         }
         else {
@@ -387,10 +336,6 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
         return objs;
     }
 
-    public void setAsyncNative(boolean asyncNative) {
-        this.asyncNative = asyncNative;
-    }
-
     public void setConfigKey(String configKey) {
         this.configKey = configKey;
     }
@@ -409,14 +354,6 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
 
     public void setCaseInsensitiveResponseHeaders(final Boolean caseInsensitiveResponseHeaders) {
         this.caseInsensitiveResponseHeaders = caseInsensitiveResponseHeaders;
-    }
-
-    public void setDynamicOperations(final boolean dynamicOperations) {
-        this.dynamicOperations = dynamicOperations;
-    }
-
-    public void setGradleProperties(final String gradleProperties) {
-        this.gradleProperties = gradleProperties;
     }
 
     public String getSerializationLibrary() {

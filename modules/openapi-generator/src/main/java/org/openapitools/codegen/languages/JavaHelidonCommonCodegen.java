@@ -22,4 +22,12 @@ import org.openapitools.codegen.languages.features.PerformBeanValidationFeatures
 public abstract class JavaHelidonCommonCodegen extends AbstractJavaCodegen
         implements BeanValidationFeatures, PerformBeanValidationFeatures {
 
+    static final String HELIDON_MP = "mp";
+    static final String HELIDON_SE = "se";
+
+    static final String MICROPROFILE_REST_CLIENT_DEFAULT_ROOT_PACKAGE = "javax";
+
+    static final String SERIALIZATION_LIBRARY_JACKSON = "jackson";
+    static final String SERIALIZATION_LIBRARY_JSONB = "jsonb";
+
 }
