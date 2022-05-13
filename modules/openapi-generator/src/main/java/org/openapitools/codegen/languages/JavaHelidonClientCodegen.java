@@ -73,8 +73,8 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
         );
 
         outputFolder = "generated-code" + File.separator + "java";
-        embeddedTemplateDir = "java-helidon/common";        // use embedded for common
-        templateDir = "java-helidon/client";
+        embeddedTemplateDir = "java-helidon" + File.separator + "common";        // use embedded for common
+        templateDir = "java-helidon" + File.separator + "client";
         invokerPackage = "org.openapitools.client";
         artifactId = "openapi-java-client";
         apiPackage = invokerPackage + ".api";
