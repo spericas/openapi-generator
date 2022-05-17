@@ -68,7 +68,7 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
      * @see org.openapitools.codegen.templating.GeneratorTemplateContentLocator#getFullTemplatePath
      */
     public JavaHelidonClientCodegen() {
-
+        // beta for now
         generatorMetadata = GeneratorMetadata.newBuilder(generatorMetadata)
                 .stability(Stability.BETA)
                 .build();
