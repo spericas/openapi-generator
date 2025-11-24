@@ -17,12 +17,28 @@
 
 package org.openapitools.codegen.languages;
 
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.servers.Server;
 import lombok.Getter;
-import org.openapitools.codegen.*;
+import org.openapitools.codegen.CliOption;
+import org.openapitools.codegen.CodegenConstants;
+import org.openapitools.codegen.CodegenModel;
+import org.openapitools.codegen.CodegenOperation;
+import org.openapitools.codegen.CodegenProperty;
+import org.openapitools.codegen.CodegenResponse;
+import org.openapitools.codegen.CodegenType;
+import org.openapitools.codegen.SupportingFile;
 import org.openapitools.codegen.meta.GeneratorMetadata;
 import org.openapitools.codegen.meta.Stability;
 import org.openapitools.codegen.meta.features.DocumentationFeature;
@@ -31,11 +47,6 @@ import org.openapitools.codegen.model.OperationMap;
 import org.openapitools.codegen.model.OperationsMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
 
 import static org.openapitools.codegen.utils.StringUtils.camelize;
 
@@ -97,6 +108,7 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
 
         supportedLibraries.put(HELIDON_MP, "Helidon MP Server");
         supportedLibraries.put(HELIDON_SE, "Helidon SE Server");
+        supportedLibraries.put(HELIDON_SE_DECL, "Helidon SE Declarative Server");
 
         CliOption libraryOption = new CliOption(CodegenConstants.LIBRARY, "library template (sub-template) to use");
         libraryOption.setEnum(supportedLibraries);
@@ -179,6 +191,15 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
         }
 
         if (isLibrary(HELIDON_MP)) {
+            String resourceFolder = "src" + File.separator + "main" + File.separator + "resources";
+            String metaInfFolder = resourceFolder + File.separator + "META-INF";
+            supportingFiles.add(new SupportingFile("RestApplication.mustache", invokerFolder, "RestApplication.java"));
+            supportingFiles.add(new SupportingFile("microprofile-config.properties.mustache", metaInfFolder, "microprofile" +
+                    "-config.properties"));
+            supportingFiles.add(new SupportingFile("beans.xml.mustache", metaInfFolder, "beans.xml"));
+            processSupportingFiles(modifiable, unmodifiable);
+        } else if (isLibrary(HELIDON_SE_DECL)) {
+            // TODO copied from MP
             String resourceFolder = "src" + File.separator + "main" + File.separator + "resources";
             String metaInfFolder = resourceFolder + File.separator + "META-INF";
             supportingFiles.add(new SupportingFile("RestApplication.mustache", invokerFolder, "RestApplication.java"));
@@ -412,7 +433,11 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
         OperationMap operations = objs.getOperations();
         if (HELIDON_MP.equals(getLibrary())) {
             return AbstractJavaJAXRSServerCodegen.jaxrsPostProcessOperations(objs);
+        } else if (HELIDON_SE_DECL.equals(getLibrary())) {
+            // TODO copied from MP
+            return AbstractJavaJAXRSServerCodegen.jaxrsPostProcessOperations(objs);
         }
+
         if (operations != null && HELIDON_SE.equals(getLibrary())) {
             genericTypeDeclarations.register(objs);
             if (HELIDON_SE.equals(getLibrary())
