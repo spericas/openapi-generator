@@ -1,0 +1,12 @@
+    @Http.{{httpMethod}}{{#subresourceOperation}}
+    @Http.Path("{{{path}}}"){{/subresourceOperation}}{{#hasConsumes}}
+    @Http.Consumes({ {{#consumes}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/consumes}} }){{/hasConsumes}}{{#hasProduces}}
+    @Http.Produces({ {{#produces}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/produces}} }){{/hasProduces}}
+    public {{>returnTypes}} {{nickname}}({{#allParams}}{{>queryParams}}{{>pathParams}}{{>cookieParams}}{{>headerParams}}{{>bodyParams}}{{>formParams}}{{^-last}}, {{/-last}}{{/allParams}}) {
+        {{#vendorExtensions.x-helidon-hasReturnType}}
+        {{{returnType}}} result = {{{vendorExtensions.x-helidon-exampleReturnTypeValue}}}; // Replace with correct business logic.
+        {{/vendorExtensions.x-helidon-hasReturnType}}
+        {{#vendorExtensions.x-helidon-hasReturnType}}
+        return result;
+        {{/vendorExtensions.x-helidon-hasReturnType}}
+    }

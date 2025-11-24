@@ -1,0 +1,5 @@
+    @Http.{{httpMethod}}{{#subresourceOperation}}
+    @Http.Path("{{{path}}}"){{/subresourceOperation}}{{#hasConsumes}}
+    @Http.Consumes({ {{#consumes}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/consumes}} }){{/hasConsumes}}{{#hasProduces}}
+    @Http.Produces({ {{#produces}}"{{{mediaType}}}"{{^-last}}, {{/-last}}{{/produces}} }){{/hasProduces}}
+    {{#useAbstractClass}}abstract {{/useAbstractClass}}{{>returnTypes}} {{nickname}}({{#allParams}}{{>queryParams}}{{>pathParams}}{{>cookieParams}}{{>headerParams}}{{>bodyParams}}{{>formParams}}{{^-last}}, {{/-last}}{{/allParams}});

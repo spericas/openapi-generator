@@ -17,12 +17,29 @@
 
 package org.openapitools.codegen.languages;
 
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.servers.Server;
 import lombok.Getter;
-import org.openapitools.codegen.*;
+import org.apache.commons.lang3.StringUtils;
+import org.openapitools.codegen.CliOption;
+import org.openapitools.codegen.CodegenConstants;
+import org.openapitools.codegen.CodegenModel;
+import org.openapitools.codegen.CodegenOperation;
+import org.openapitools.codegen.CodegenProperty;
+import org.openapitools.codegen.CodegenResponse;
+import org.openapitools.codegen.CodegenType;
+import org.openapitools.codegen.SupportingFile;
 import org.openapitools.codegen.meta.GeneratorMetadata;
 import org.openapitools.codegen.meta.Stability;
 import org.openapitools.codegen.meta.features.DocumentationFeature;
@@ -31,11 +48,6 @@ import org.openapitools.codegen.model.OperationMap;
 import org.openapitools.codegen.model.OperationsMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
 
 import static org.openapitools.codegen.utils.StringUtils.camelize;
 
@@ -97,6 +109,7 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
 
         supportedLibraries.put(HELIDON_MP, "Helidon MP Server");
         supportedLibraries.put(HELIDON_SE, "Helidon SE Server");
+        supportedLibraries.put(HELIDON_SE_DECL, "Helidon SE Declarative Server");
 
         CliOption libraryOption = new CliOption(CodegenConstants.LIBRARY, "library template (sub-template) to use");
         libraryOption.setEnum(supportedLibraries);
@@ -190,20 +203,20 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
             artifactId = "openapi-helidon-se-server";
 
             modifiable.add(new SupportingFile("application.mustache",
-                    ("src.main.resources").replace(".", java.io.File.separator), "application.yaml"));
+                                              ("src.main.resources").replace(".", java.io.File.separator), "application.yaml"));
             modifiable.add(new SupportingFile("mainTest.mustache",
-                    (testFolder + File.separator + invokerPackage).replace(".", java.io.File.separator),
-                    "MainTest.java"));
+                                              (testFolder + File.separator + invokerPackage).replace(".", java.io.File.separator),
+                                              "MainTest.java"));
             modifiable.add(new SupportingFile("main.mustache",
-                    (sourceFolder + File.separator + invokerPackage).replace(".", java.io.File.separator),
-                    "Main.java"));
+                                              (sourceFolder + File.separator + invokerPackage).replace(".", java.io.File.separator),
+                                              "Main.java"));
             unmodifiable.add(new SupportingFile("validatorUtils.mustache",
-                    apiFolder(),
-                    "ValidatorUtils.java"));
+                                                apiFolder(),
+                                                "ValidatorUtils.java"));
             if (helidonMajorVersion > 3 && useAbstractClass) {
                 unmodifiable.add(new SupportingFile("partsUtils.mustache",
-                        apiFolder(),
-                        "PartsUtils.java"));
+                                                    apiFolder(),
+                                                    "PartsUtils.java"));
             }
             if (useAbstractClass) {
                 importMapping.put("HashMap", "java.util.HashMap");
@@ -216,10 +229,42 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
             }
             importMapping.put("Map", "java.util.Map");
             importMapping.put("ReadableBodyPart",  // use the old ReadableBodyPart name for backward compatibility
-                    (helidonMajorVersion <= 3)
-                            ? "io.helidon.media.multipart.ReadableBodyPart"
-                            : "io.helidon.http.media.multipart.ReadablePart");
+                              (helidonMajorVersion <= 3)
+                                      ? "io.helidon.media.multipart.ReadableBodyPart"
+                                      : "io.helidon.http.media.multipart.ReadablePart");
             importMapping.put("Handler", "io.helidon.webserver." + (helidonMajorVersion != 3 ? "http." : "") + "Handler");
+            importMapping.put("GenericType", "io.helidon.common.GenericType");
+            importMapping.put("GenericTypes", modelPackage + ".GenericTypes");
+            importMapping.put("Optional", "java.util.Optional");
+            processSupportingFiles(modifiable, unmodifiable);
+        } else if (isLibrary(HELIDON_SE_DECL)) {
+            // TODO: copied from SE
+            artifactId = "openapi-helidon-se-server";
+
+            modifiable.add(new SupportingFile("application.mustache",
+                    ("src.main.resources").replace(".", java.io.File.separator), "application.yaml"));
+            modifiable.add(new SupportingFile("mainTest.mustache",
+                    (testFolder + File.separator + invokerPackage).replace(".", java.io.File.separator),
+                    "MainTest.java"));
+            modifiable.add(new SupportingFile("main.mustache",
+                    (sourceFolder + File.separator + invokerPackage).replace(".", java.io.File.separator),
+                    "Main.java"));
+            if (useAbstractClass) {
+                unmodifiable.add(new SupportingFile("partsUtils.mustache",
+                                                    apiFolder(),
+                                                    "PartsUtils.java"));
+
+                importMapping.put("HashMap", "java.util.HashMap");
+                importMapping.put("ArrayList", "java.util.ArrayList");
+                importMapping.put("ByteArrayOutputStream", "java.io.ByteArrayOutputStream");
+                importMapping.put("DataChunk", "io.helidon.common.http.DataChunk");
+                importMapping.put("UncheckedIOException", "java.io.UncheckedIOException");
+                importMapping.put("IOException", "java.io.IOException");
+                importMapping.put("ByteArrayInputStream", "java.io.ByteArrayInputStream");
+            }
+            importMapping.put("Map", "java.util.Map");
+            importMapping.put("ReadableBodyPart", "io.helidon.http.media.multipart.ReadablePart");
+            importMapping.put("Handler", "io.helidon.webserver.http.Handler");
             importMapping.put("GenericType", "io.helidon.common.GenericType");
             importMapping.put("GenericTypes", modelPackage + ".GenericTypes");
             importMapping.put("Optional", "java.util.Optional");
@@ -412,27 +457,31 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
         OperationMap operations = objs.getOperations();
         if (HELIDON_MP.equals(getLibrary())) {
             return AbstractJavaJAXRSServerCodegen.jaxrsPostProcessOperations(objs);
-        }
-        if (operations != null && HELIDON_SE.equals(getLibrary())) {
-            genericTypeDeclarations.register(objs);
-            if (HELIDON_SE.equals(getLibrary())
-                    && helidonMajorVersion > 3
-                    && !genericTypeDeclarations.genericTypeDeclarations().isEmpty()) {
-                additionalProperties.put(GenericTypeDeclarations.HAS_ATTR_NAME, true);
-                additionalProperties.put(GenericTypeDeclarations.ATTR_NAME, genericTypeDeclarations.genericTypeDeclarations());
-                if (helidonMajorVersion > 3) {
-                    supportingFiles.add(new SupportingFile("genericTypes.mustache", modelFolder(), "GenericTypes.java"));
-                    supportingFiles.add(new SupportingFile("hcollectors.mustache", apiFolder(), "HCollectors.java"));
+        } else if (HELIDON_SE_DECL.equals(getLibrary())) {
+            return seDeclPostProcessOperations(objs);
+        } else if (HELIDON_SE.equals(getLibrary())) {
+            if (operations != null) {
+                genericTypeDeclarations.register(objs);
+                if (helidonMajorVersion > 3
+                        && !genericTypeDeclarations.genericTypeDeclarations().isEmpty()) {
+                    additionalProperties.put(GenericTypeDeclarations.HAS_ATTR_NAME, true);
+                    additionalProperties.put(GenericTypeDeclarations.ATTR_NAME,
+                                             genericTypeDeclarations.genericTypeDeclarations());
+                    if (helidonMajorVersion > 3) {
+                        supportingFiles.add(new SupportingFile("genericTypes.mustache", modelFolder(), "GenericTypes.java"));
+                        supportingFiles.add(new SupportingFile("hcollectors.mustache", apiFolder(), "HCollectors.java"));
+                    }
+                }
+                List<CodegenOperation> ops = operations.getOperation();
+                for (CodegenOperation operation : ops) {
+                    if (!operation.formParams.isEmpty()) {
+                        objs.put("isFormParamsFunctions", true);
+                    }
                 }
             }
-            List<CodegenOperation> ops = operations.getOperation();
-            for (CodegenOperation operation : ops) {
-                if (operation.formParams.size() > 0) {
-                    objs.put("isFormParamsFunctions", true);
-                }
-            }
+            return objs;
         }
-        return objs;
+        throw new IllegalStateException("Unknown library type " + getLibrary());
     }
 
     @Override
@@ -492,6 +541,54 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
         Path buildGradle = projectFolder.resolve("build.gradle");
         Path src = projectFolder.resolve(Paths.get(sourceFolder, invokerPackage.replace('.', File.separatorChar)));
         return (pom.toFile().exists() || buildGradle.toFile().exists()) && src.toFile().exists();
+    }
+
+    /**
+     * Set a value for property commonPath.
+     *
+     * @param objs operations map
+     * @return updated operations map
+     */
+    static OperationsMap seDeclPostProcessOperations(OperationsMap objs) {
+        OperationMap operations = objs.getOperations();
+        String commonPath = null;
+
+        if (operations != null) {
+            List<CodegenOperation> ops = operations.getOperation();
+            for (CodegenOperation operation : ops) {
+                if (commonPath == null) {
+                    commonPath = operation.path;
+                } else {
+                    commonPath = getCommonPath(commonPath, operation.path);
+                }
+            }
+            for (CodegenOperation co : ops) {
+                co.path = StringUtils.removeStart(co.path, commonPath);
+                co.subresourceOperation = co.path.length() > 1;
+            }
+            objs.put("commonPath", "/".equals(commonPath) ? StringUtils.EMPTY : commonPath);
+        }
+        return objs;
+    }
+
+    /**
+     * Find a common path between two paths.
+     *
+     * @param path1 first path
+     * @param path2 second path
+     * @return common path
+     */
+    private static String getCommonPath(String path1, String path2) {
+        final String[] parts1 = StringUtils.split(path1, "/");
+        final String[] parts2 = StringUtils.split(path2, "/");
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < Math.min(parts1.length, parts2.length); i++) {
+            if (!parts1[i].equals(parts2[i])) {
+                break;
+            }
+            builder.append("/").append(parts1[i]);
+        }
+        return builder.toString();
     }
 }
 

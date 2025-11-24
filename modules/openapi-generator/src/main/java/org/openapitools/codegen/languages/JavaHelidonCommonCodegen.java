@@ -17,26 +17,6 @@
 
 package org.openapitools.codegen.languages;
 
-import io.swagger.v3.oas.models.Operation;
-import io.swagger.v3.oas.models.parameters.Parameter;
-import io.swagger.v3.oas.models.responses.ApiResponse;
-import io.swagger.v3.oas.models.servers.Server;
-import lombok.Getter;
-import org.apache.commons.lang3.StringUtils;
-import org.eclipse.aether.util.version.GenericVersionScheme;
-import org.eclipse.aether.version.InvalidVersionSpecificationException;
-import org.eclipse.aether.version.Version;
-import org.eclipse.aether.version.VersionConstraint;
-import org.eclipse.aether.version.VersionScheme;
-import org.openapitools.codegen.*;
-import org.openapitools.codegen.languages.features.BeanValidationFeatures;
-import org.openapitools.codegen.languages.features.PerformBeanValidationFeatures;
-import org.openapitools.codegen.model.ModelMap;
-import org.openapitools.codegen.model.OperationMap;
-import org.openapitools.codegen.model.OperationsMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,7 +29,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
@@ -57,13 +46,49 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static org.openapitools.codegen.CodegenConstants.*;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.parameters.Parameter;
+import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.servers.Server;
+import lombok.Getter;
+import org.apache.commons.lang3.StringUtils;
+import org.eclipse.aether.util.version.GenericVersionScheme;
+import org.eclipse.aether.version.InvalidVersionSpecificationException;
+import org.eclipse.aether.version.Version;
+import org.eclipse.aether.version.VersionConstraint;
+import org.eclipse.aether.version.VersionScheme;
+import org.openapitools.codegen.CliOption;
+import org.openapitools.codegen.CodegenConstants;
+import org.openapitools.codegen.CodegenOperation;
+import org.openapitools.codegen.CodegenParameter;
+import org.openapitools.codegen.CodegenProperty;
+import org.openapitools.codegen.CodegenResponse;
+import org.openapitools.codegen.SupportingFile;
+import org.openapitools.codegen.languages.features.BeanValidationFeatures;
+import org.openapitools.codegen.languages.features.PerformBeanValidationFeatures;
+import org.openapitools.codegen.model.ModelMap;
+import org.openapitools.codegen.model.OperationMap;
+import org.openapitools.codegen.model.OperationsMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.openapitools.codegen.CodegenConstants.DEVELOPER_EMAIL;
+import static org.openapitools.codegen.CodegenConstants.DEVELOPER_NAME;
+import static org.openapitools.codegen.CodegenConstants.DEVELOPER_ORGANIZATION;
+import static org.openapitools.codegen.CodegenConstants.DEVELOPER_ORGANIZATION_URL;
+import static org.openapitools.codegen.CodegenConstants.PARENT_ARTIFACT_ID;
+import static org.openapitools.codegen.CodegenConstants.PARENT_GROUP_ID;
+import static org.openapitools.codegen.CodegenConstants.PARENT_VERSION;
+import static org.openapitools.codegen.CodegenConstants.SCM_CONNECTION;
+import static org.openapitools.codegen.CodegenConstants.SCM_DEVELOPER_CONNECTION;
+import static org.openapitools.codegen.CodegenConstants.SCM_URL;
 
 public abstract class JavaHelidonCommonCodegen extends AbstractJavaCodegen
         implements BeanValidationFeatures, PerformBeanValidationFeatures {
 
     static final String HELIDON_MP = "mp";
     static final String HELIDON_SE = "se";
+    static final String HELIDON_SE_DECL = "se_decl";
 
     static final String MICROPROFILE_ROOT_PACKAGE = "rootJavaEEPackage";
     static final String MICROPROFILE_ROOT_DEP_PREFIX = "x-helidon-rootJavaEEDepPrefix";

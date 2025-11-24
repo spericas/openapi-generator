@@ -17,6 +17,19 @@
 
 package org.openapitools.codegen.languages;
 
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.servers.Server;
@@ -24,7 +37,16 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.openapitools.codegen.*;
+import org.openapitools.codegen.CliOption;
+import org.openapitools.codegen.CodegenConstants;
+import org.openapitools.codegen.CodegenModel;
+import org.openapitools.codegen.CodegenOperation;
+import org.openapitools.codegen.CodegenParameter;
+import org.openapitools.codegen.CodegenProperty;
+import org.openapitools.codegen.CodegenResponse;
+import org.openapitools.codegen.CodegenType;
+import org.openapitools.codegen.SupportingFile;
+import org.openapitools.codegen.VendorExtension;
 import org.openapitools.codegen.meta.GeneratorMetadata;
 import org.openapitools.codegen.meta.Stability;
 import org.openapitools.codegen.meta.features.DocumentationFeature;
@@ -34,11 +56,6 @@ import org.openapitools.codegen.model.ModelsMap;
 import org.openapitools.codegen.model.OperationsMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
 
 import static org.openapitools.codegen.CodegenConstants.SERIALIZATION_LIBRARY;
 
@@ -95,6 +112,7 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
 
         supportedLibraries.put(HELIDON_MP, "Helidon MP Client");
         supportedLibraries.put(HELIDON_SE, "Helidon SE Client");
+        supportedLibraries.put(HELIDON_SE_DECL, "Helidon SE Declarative Client");
 
         CliOption libraryOption = new CliOption(CodegenConstants.LIBRARY,
                 "library template (sub-template) to use");
@@ -193,6 +211,29 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
             }
             importMapping.put("Pair", invokerPackage + ".Pair");
 
+            List<SupportingFile> modifiable = new ArrayList<>();
+            modifiable.add(new SupportingFile("pom.mustache", "", "pom.xml"));
+            modifiable.add(new SupportingFile("README.mustache", "", "README.md"));
+
+            List<SupportingFile> unmodifiable = new ArrayList<>();
+            unmodifiable.add(new SupportingFile("ApiResponse.mustache", invokerFolder.toString(), "ApiResponse.java"));
+            unmodifiable.add(new SupportingFile("ApiResponseBase.mustache", invokerFolder.toString(), "ApiResponseBase.java"));
+            unmodifiable.add(new SupportingFile("ApiClient.mustache", invokerFolder.toString(), "ApiClient.java"));
+            unmodifiable.add(new SupportingFile("Pair.mustache", invokerFolder.toString(), "Pair.java"));
+            unmodifiable.add(new SupportingFile("ResponseType.mustache", apiFolder.toString(), "ResponseType.java"));
+
+            processSupportingFiles(modifiable, unmodifiable);
+        } else if (isLibrary(HELIDON_SE_DECL)) {
+            // TODO: Copied from SE for now
+            apiTemplateFiles.put("api_impl.mustache", ".java");
+            importMapping.put("StringJoiner", "java.util.StringJoiner");
+            if (helidonMajorVersion == 3) {
+                importMapping.put("WebClientRequestHeaders", "io.helidon.webclient.WebClientRequestHeaders");
+            } else {
+                importMapping.put("ClientRequestHeaders", "io.helidon.http.ClientRequestHeaders");
+                importMapping.put("HeaderNames", "io.helidon.http.HeaderNames");
+            }
+            importMapping.put("Pair", invokerPackage + ".Pair");
 
             List<SupportingFile> modifiable = new ArrayList<>();
             modifiable.add(new SupportingFile("pom.mustache", "", "pom.xml"));
@@ -252,6 +293,31 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
         if (isLibrary(HELIDON_MP)) {
             super.postProcessOperationsWithModels(objs, allModels);
             return AbstractJavaJAXRSServerCodegen.jaxrsPostProcessOperations(objs);
+        } else if(isLibrary(HELIDON_SE_DECL)) {
+            // TODO: copied from SE
+            // Compute the imports to declare in the generated API impl class.
+            List<Map<String, String>> imports = objs.getImports();
+            List<Map<String, String>> implImports = new ArrayList<>(imports);
+
+            Set<String> requiredImplImportClassNames = new HashSet<>();
+            for (CodegenOperation op : objs.getOperations().getOperation()) {
+                requiredImplImportClassNames.addAll((Set) op.vendorExtensions.get(X_HELIDON_REQUIRED_IMPL_IMPORTS));
+            }
+
+            Set<String> missingImportClassNames = new TreeSet<>(requiredImplImportClassNames);
+            imports.stream()
+                    .map(m -> m.get("classname"))
+                    .forEach(missingImportClassNames::remove);
+
+            missingImportClassNames.forEach(c -> {
+                Map<String, String> singleImportMap = new HashMap<>();
+                singleImportMap.put("classname", c);
+                singleImportMap.put("import", Objects.requireNonNull(importMapping.get(c), "no mapping for " + c));
+                implImports.add(singleImportMap);
+            });
+
+            objs.put(X_HELIDON_IMPL_IMPORTS, implImports);
+            return objs;
         } else {
             // Compute the imports to declare in the generated API impl class.
             List<Map<String, String>> imports = objs.getImports();
@@ -357,6 +423,10 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
             // TODO check for SE-specifics
             model.imports.remove("ApiModelProperty");
             model.imports.remove("ApiModel");
+        } else if (HELIDON_SE_DECL.equals(getLibrary())) {
+            // TODO copied
+            model.imports.remove("ApiModelProperty");
+            model.imports.remove("ApiModel");
         }
 
         if ("set".equals(property.containerType) && !JACKSON.equals(serializationLibrary)) {
@@ -370,6 +440,12 @@ public class JavaHelidonClientCodegen extends JavaHelidonCommonCodegen {
     public CodegenModel fromModel(String name, Schema model) {
         CodegenModel codegenModel = super.fromModel(name, model);
         if (isLibrary(HELIDON_MP)) {
+            if (codegenModel.imports.contains("ApiModel")) {
+                // Remove io.swagger.annotations.ApiModel import
+                codegenModel.imports.remove("ApiModel");
+            }
+        } else if (isLibrary(HELIDON_SE_DECL)) {
+            // TODO: copied from SE
             if (codegenModel.imports.contains("ApiModel")) {
                 // Remove io.swagger.annotations.ApiModel import
                 codegenModel.imports.remove("ApiModel");
