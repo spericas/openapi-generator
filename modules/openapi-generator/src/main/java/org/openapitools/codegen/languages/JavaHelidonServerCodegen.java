@@ -36,6 +36,7 @@ import org.openapitools.codegen.CliOption;
 import org.openapitools.codegen.CodegenConstants;
 import org.openapitools.codegen.CodegenModel;
 import org.openapitools.codegen.CodegenOperation;
+import org.openapitools.codegen.CodegenParameter;
 import org.openapitools.codegen.CodegenProperty;
 import org.openapitools.codegen.CodegenResponse;
 import org.openapitools.codegen.CodegenType;
@@ -238,8 +239,10 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
             importMapping.put("Optional", "java.util.Optional");
             processSupportingFiles(modifiable, unmodifiable);
         } else if (isLibrary(HELIDON_SE_DECL)) {
-            // TODO: copied from SE
             artifactId = "openapi-helidon-se-server";
+
+            // we cannot use Jakarta bean validation and @Valid here
+            this.useBeanValidation = false;
 
             modifiable.add(new SupportingFile("application.mustache",
                     ("src.main.resources").replace(".", java.io.File.separator), "application.yaml"));
@@ -422,6 +425,30 @@ public class JavaHelidonServerCodegen extends JavaHelidonCommonCodegen {
             if (codegenOperation.isMultipart && helidonMajorVersion > 3) {
                 codegenOperation.imports.add("Map");
             }
+        } else if (HELIDON_SE_DECL.equals(getLibrary())) {
+            // no support for form or cookie params yet
+            if (codegenOperation.getHasFormParams() || codegenOperation.getHasCookieParams()) {
+                List<CodegenParameter> forRemoval = new ArrayList<>();
+                codegenOperation.allParams.forEach(p -> {
+                    if (p.isFormParam || p.isCookieParam) {
+                        forRemoval.add(p);
+                    }
+                });
+                forRemoval.forEach(codegenOperation.allParams::remove);
+                if (codegenOperation.getHasFormParams()) {
+                    codegenOperation.formParams.clear();
+                }
+                if (codegenOperation.getHasCookieParams()) {
+                    codegenOperation.cookieParams.clear();
+                }
+            }
+
+            // patch data types removing "@Valid" for now
+            codegenOperation.allParams.forEach(p -> {
+                if (p.dataType.contains("@Valid")) {
+                    p.dataType = p.dataType.replace("@Valid ", "");
+                }
+            });
         }
         return codegenOperation;
     }
